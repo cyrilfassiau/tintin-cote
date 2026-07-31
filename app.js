@@ -416,8 +416,7 @@ function blocEdition(a) {
         <button class="var ${state.edition && state.edition.code === e.code ? 'on' : ''}" data-edition="${e.code}">
           <b>${e.code}</b><span>${e.annee}${e.eo ? ' · EO' : ''}</span></button>`).join('')}
     </div>
-    <p class="global-tiny-text" style="margin-top:14px">Vous ne reconnaissez aucune de ces variantes&nbsp;?
-       <span class="global-link" data-noop>Envoyez-nous une photo du quatrième plat</span> — nous complétons le référentiel en continu.</p>
+    
   </div>`;
 }
 
