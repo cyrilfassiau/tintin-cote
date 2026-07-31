@@ -433,7 +433,7 @@ function blocOptions(a) {
         const on = state.options.includes(o.code);
         return `<button class="opt ${on ? 'on' : ''}" data-option="${o.code}">
           <span class="box">✓</span>
-          <span class="txt"><span class="ot">${o.nom} <em>+${Math.round(o.mod * 100)}&nbsp;%</em></span>
+          
           <span class="oa">${o.aide}</span></span></button>`;
       }).join('')}
     </div>
@@ -515,7 +515,7 @@ function blocResultat(a) {
             <div class="trend">
               <div class="th">
                 <span class="tl">${state.edition.code} en très bon état · 6 ans</span>
-                <span class="tp ${up ? '' : 'down'}">${up ? '+' : ''}${est.tendance.toString().replace('.', ',')}&nbsp;%</span>
+             
               </div>
               ${courbeSVG(a, state.edition)}
             </div>
