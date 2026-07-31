@@ -452,7 +452,7 @@ function blocEtat(a) {
         <button class="etat ${state.etat === e.code ? 'on' : ''}" data-etat="${e.code}">
           ${e.ref ? '<span class="ref">RÉFÉRENCE</span>' : ''}
           <span class="et">${e.nom}</span>
-          <span class="ec">× ${e.coef.toFixed(2).replace('.', ',')}</span>
+         
           <span class="ed">${e.desc}</span></button>`).join('')}
     </div>
   </div>`;
