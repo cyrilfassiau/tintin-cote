@@ -38,51 +38,39 @@ const cover = a => `assets/covers/${a.slug}.png`;
 
 
 
-const PLANCHER = {
-  P: () => 2500,
-  A: () => 220,
-  B: y => 90 - (y - 1946) * 1.3,
-  C: y => 34 - (y - 1976) * 0.55,
-  D: y => 14 - (y - 2011) * 0.2
-};
+const serieDe = plat => plat === 'blanc' ? 'V' : plat[0];
+const nomPlat = e => e.plat === 'blanc' ? '2e plat blanc' : `2e plat ${e.plat}`;
+const codePlat = e => e.plat === 'blanc' ? 'Blanc' : e.plat;
 
-
+// Cotes et descriptions issues de data.js ; ventes et tendance restent simulées.
 function editions(album) {
-  let plafond = Infinity;
-  return VARIANTES
-    .filter(v => v.annee >= album.annee && (v.serie !== 'P' || album.annee <= 1934))
-    .filter(v => v.serie !== 'A' || album.nb || album.annee >= 1942)
-    .map(v => {
-      const rnd = seeded(album.slug + v.code);
-      const age = v.annee - album.annee;
-      const brut = album.eo * Math.exp(-0.145 * age) * (0.9 + rnd() * 0.24);
-     
-      const valeur = Math.max(PLANCHER[v.serie](v.annee), Math.min(brut, plafond));
-      plafond = valeur;
-      return {
-        code: v.code, serie: v.serie, annee: v.annee, cote: arrondi(valeur),
-        eo: age === 0,
-        ventes: 3 + Math.floor(rnd() * 26),
-        tendance: Math.round((rnd() * 30 - 8) * 10) / 10
-      };
-    });
+  return album.editions.map((e, i) => {
+    const rnd = seeded(album.slug + i);
+    return {
+      ...e, id: String(i), serie: serieDe(e.plat),
+      ventes: 3 + Math.floor(rnd() * 26),
+      tendance: Math.round((rnd() * 30 - 8) * 10) / 10
+    };
+  });
 }
 
 const editionsSerie = (album, serie) => editions(album).filter(e => e.serie === serie);
-const seriesDispo = album => ['P', 'A', 'B', 'C', 'D'].filter(s => editionsSerie(album, s).length);
+const seriesDispo = album => Object.keys(SERIES).filter(s => editionsSerie(album, s).length);
+const coteEO = album => {
+  const eo = album.editions.filter(e => e.eo && e.cote != null);
+  return eo.length ? Math.max(...eo.map(e => e.cote)) : null;
+};
+const nbEditions = () => ALBUMS.reduce((n, a) => n + a.editions.length, 0);
 
 
 
-function estimer(album, edition, etatCode, optionsCochees) {
+function estimer(album, edition, etatCode) {
   const etat = ETATS.find(e => e.code === etatCode);
   const base = edition.cote;
   const apresEtat = base * etat.coef;
-  const mods = OPTIONS
-    .filter(o => optionsCochees.includes(o.code))
-    .map(o => ({ nom: o.nom, montant: apresEtat * o.mod }));
-  const total = apresEtat + mods.reduce((s, m) => s + m.montant, 0);
+  const total = apresEtat;
   return {
-    base, etat, apresEtat, mods,
+    base, etat, apresEtat,
     total: arrondi(total),
     bas: arrondi(total * 0.82),
     haut: arrondi(total * 1.24),
@@ -96,7 +84,7 @@ function estimer(album, edition, etatCode, optionsCochees) {
 function platSVG(serie) {
   const c = SERIES[serie].couleur;
   const cadre = (inner, fond) =>
-    `<svg class="plat" viewBox="0 0 88 112" role="img" aria-label="Quatrième plat ${serie}">
+    `<svg class="plat" viewBox="0 0 88 112" role="img" aria-label="2e plat ${serie}">
        <rect x="1" y="1" width="86" height="110" rx="3" fill="${fond}" stroke="rgba(0,0,0,.16)"/>
        ${inner}
      </svg>`;
@@ -122,18 +110,13 @@ function platSVG(serie) {
       g += `<rect x="${8 + k * 15}" y="${8 + r * 16.5}" width="12" height="13.5" rx="1" fill="${c}" opacity="${0.3 + ((r + k) % 4) * 0.17}"/>`;
     return cadre(g, '#fdf6ea');
   }
-  let g = '';
-  for (let r = 0; r < 3; r++) for (let k = 0; k < 5; k++)
-    g += `<rect x="${8 + k * 15}" y="${8 + r * 16.5}" width="12" height="13.5" rx="1" fill="${c}" opacity="${0.3 + ((r + k) % 4) * 0.16}"/>`;
-  g += `<g transform="translate(24,74)">${Array.from({ length: 16 }, (_, i) =>
-    `<rect x="${i * 2.4}" y="0" width="${i % 3 ? 1 : 1.8}" height="20" fill="#222" opacity=".7"/>`).join('')}</g>`;
-  return cadre(g, '#f4f6f7');
+  return cadre('', '#f7f5f0');
 }
 
 
 
 function ventesComparables(album, edition, etat) {
-  const rnd = seeded(album.slug + edition.code + etat.code);
+  const rnd = seeded(album.slug + edition.id + etat.code);
   const sites = ['Vente aux enchères — Paris', 'Libraire spécialisé', 'Enchères en ligne', 'Salon du livre ancien', 'Vente privée'];
   const etats = ETATS.filter(e => Math.abs(e.coef - etat.coef) < 0.45);
  
@@ -151,7 +134,7 @@ function ventesComparables(album, edition, etat) {
 }
 
 function courbeSVG(album, edition) {
-  const rnd = seeded(album.slug + edition.code + 'trend');
+  const rnd = seeded(album.slug + edition.id + 'trend');
   const n = 7, pts = [];
   let v = 100;
   for (let i = 0; i < n; i++) { pts.push(v); v *= 1 + (edition.tendance / 100 / n) + (rnd() - 0.5) * 0.06; }
@@ -177,7 +160,6 @@ const state = {
   serie: null,
   edition: null,
   etat: null,
-  options: [],
   collection: JSON.parse(localStorage.getItem('cote-collection') || '[]')
 };
 
@@ -185,7 +167,7 @@ const app = $('#app');
 
 function go(vue, slug) {
   state.vue = vue; state.slug = slug || null;
-  state.serie = state.edition = state.etat = null; state.options = [];
+  state.serie = state.edition = state.etat = null;
   window.scrollTo({ top: 0, behavior: 'instant' });
   render();
 }
@@ -201,13 +183,14 @@ function vueAccueil() {
       <div>
         <h1 class="global-title">Quelle est la cote de votre album Tintin&nbsp;?</h1>
         <p class="global-text">Un album ne vaut ni par sa date de copyright, ni par son dépôt légal.
-          Ce qui compte, c’est le <b>quatrième plat</b>, l’édition exacte et l’état de conservation.
+          Ce qui compte, c’est le <b>2e plat</b>, l’édition exacte et l’état de conservation.
           Notre estimateur vous guide pas à pas, album par album.</p>
         <div class="figures">
-          <div class="figure"><div class="n">24</div><div class="l">albums couverts</div></div>
-          <div class="figure"><div class="n">312</div><div class="l">éditions référencées</div></div>
-         
+          <div class="figure"><div class="n">${ALBUMS.length}</div><div class="l">albums couverts</div></div>
+          <div class="figure"><div class="n">${nbEditions()}</div><div class="l">éditions référencées</div></div>
+
         </div>
+        ${encartParties()}
       </div>
       <div>
         <div class="cards" style="margin:0">
@@ -215,9 +198,9 @@ function vueAccueil() {
             <li><span class="n">1</span><span><span class="t">Je choisis mon album</span>
               <span class="d">Parmi les 24 aventures, de Soviets à l’Alph-Art.</span></span></li>
             <li><span class="n">2</span><span><span class="t">J’identifie mon édition</span>
-              <span class="d">Le quatrième plat, puis la variante précise.</span></span></li>
-            <li><span class="n">3</span><span><span class="t">Je décris mon exemplaire</span>
-              <span class="d">Dos, pages de garde, jaquette, puis l’état.</span></span></li>
+              <span class="d">Le 2e plat, puis la variante précise.</span></span></li>
+            <li><span class="n">3</span><span><span class="t">J’évalue son état</span>
+              <span class="d">Coiffes, coins et plats, du neuf au mauvais état.</span></span></li>
             <li><span class="n">4</span><span><span class="t">J’obtiens sa cote</span>
               <span class="d">Une fourchette argumentée, avec les ventes comparables.</span></span></li>
           </ul>
@@ -228,8 +211,9 @@ function vueAccueil() {
 
   <section class="app-content finder">
     <p class="global-text" style="margin:35px 0 0;max-width:900px">L’<b>année du copyright</b> indiquée dans
-      le livre <b>n’est pas toujours celle de l’impression</b> de l’album&nbsp;: fiez-vous au <b>deuxième plat</b>
-      pour dater votre édition. Les cotes sont données pour un album en <b>état neuf</b>&nbsp;; s’il est usé,
+      le livre <b>n’est pas toujours celle de l’impression</b> de l’album&nbsp;: fiez-vous au <b>2e plat</b>
+      pour dater votre édition. Les cotes sont données pour un album en <b>très bon état (TBE)</b>&nbsp;;
+      en <b>état neuf</b>, elle augmente <b>de 200 à 300&nbsp;%</b> selon les titres, et s’il est usé,
       sa cote <b>diminue d’au moins 50&nbsp;%</b>.</p>
 
     <div class="sec-head">
@@ -244,22 +228,72 @@ function vueAccueil() {
     <h2 class="global-sub-title">Bien identifier son album</h2>
     <div class="cols3">
       <div class="cards">
-        <h3 class="global-small-title">Le quatrième plat</h3>
-        <p class="global-tiny-text">C’est l’arrière de l’album, où figure la liste des titres d’Hergé. À ne pas
-          confondre avec le dos, seul visible une fois l’album rangé. C’est lui qui date réellement l’édition.</p>
+        <h3 class="global-small-title">Le 2e plat</h3>
+        <p class="global-tiny-text">C’est l’arrière de l’album, où figure la liste des titres d’Hergé (A18, B24, C3…).
+          À ne pas confondre avec le dos, seul visible une fois l’album rangé. C’est lui qui date réellement l’édition.</p>
       </div>
       <div class="cards">
         <h3 class="global-small-title">Le dos et les gardes</h3>
-        <p class="global-tiny-text">Dos rond toilé, couleur des pages de garde, présence d’une jaquette : autant de
-          détails qui séparent deux exemplaires d’apparence identique — et parfois du simple au triple.</p>
+        <p class="global-tiny-text">Dos rouge, bleu, jaune ou imprimé, gardes bleu foncé ou bleu clair, numéro
+          d’imprimeur Danel : autant de détails qui séparent deux exemplaires d’apparence identique.</p>
       </div>
       <div class="cards">
         <h3 class="global-small-title">L’état de conservation</h3>
-        <p class="global-tiny-text">Le facteur le plus déterminant. Entre un exemplaire neuf et le même en état
-          moyen, la cote peut être divisée par quatre. Les coiffes et les coins se regardent en premier.</p>
+        <p class="global-tiny-text">Le facteur le plus déterminant. Les cotes sont données en très bon état&nbsp;;
+          un exemplaire en état neuf vaut 200 à 300&nbsp;% de plus. Les coiffes et les coins se regardent en premier.</p>
       </div>
     </div>
   </section>`;
+}
+
+// Repères du modèle 3D (assets/models/album.glb, unités en mètres).
+// position / normale : point d'ancrage sur le modèle ; vue : orbite caméra « theta phi ».
+// En remplaçant le modèle, ajustez positions et normales à sa géométrie.
+const PARTIES = [
+  { nom: 'Premier plat', desc: 'La couverture, avec l’illustration et le titre.',
+    position: '0.02 0.03 0.0068', normale: '0 0 1', vue: '0deg 80deg' },
+  { nom: '2e plat', desc: 'L’arrière de l’album, avec la liste des titres&nbsp;: il date l’édition.',
+    position: '0.02 0 -0.0068', normale: '0 0 -1', vue: '180deg 80deg' },
+  { nom: 'Dos', desc: 'La partie visible quand l’album est rangé dans une bibliothèque.',
+    position: '-0.115 0 0', normale: '-1 0 0', vue: '-65deg 80deg' },
+  { nom: 'Coiffes', desc: 'Le haut et le bas du dos, premières zones à s’user.',
+    position: '-0.115 0.151 0', normale: '-0.7 0.7 0', vue: '-55deg 40deg' },
+  { nom: 'Mors', desc: 'La charnière entre le dos et les plats&nbsp;; elle se fend à l’usage.',
+    position: '-0.1125 -0.07 0.0065', normale: '-0.7 0 0.7', vue: '-40deg 75deg' },
+  { nom: 'Tranches', desc: 'Les bords des pages&nbsp;: tête, queue et gouttière (côté ouverture).',
+    position: '0.111 -0.02 0', normale: '1 0 0', vue: '60deg 70deg' },
+  { nom: 'Coins', desc: 'Les angles des plats, souvent émoussés ou «&nbsp;tapés&nbsp;».',
+    position: '0.1135 -0.151 0.0065', normale: '0.6 -0.6 0.5', vue: '35deg 95deg' }
+];
+const VUE_INITIALE = '-30deg 70deg auto';
+
+function encartParties() {
+  return `
+  <div class="cards parties">
+    <h2 class="global-small-title">Les parties d’un album</h2>
+    <p class="global-tiny-text">Faites tourner l’album avec la souris, ou cliquez sur une partie pour la voir.</p>
+    <model-viewer id="album-3d" class="viewer" src="assets/models/album.glb" alt="Modèle 3D d’un album"
+      camera-controls disable-zoom touch-action="pan-y" interaction-prompt="none" shadow-intensity="1"
+      camera-orbit="${VUE_INITIALE}" min-camera-orbit="auto 5deg auto" max-camera-orbit="auto 175deg auto">
+      ${PARTIES.map((p, i) => `
+        <button class="hotspot" slot="hotspot-${i}" data-partie="${i}" data-position="${p.position}"
+          data-normal="${p.normale}" data-visibility-attribute="visible" title="${p.nom}">${i + 1}</button>`).join('')}
+    </model-viewer>
+    <ol class="legende">
+      ${PARTIES.map((p, i) => `
+        <li><button data-partie="${i}"><span class="n">${i + 1}</span>
+          <span><span class="t">${p.nom}</span><span class="d">${p.desc}</span></span></button></li>`).join('')}
+    </ol>
+    <p class="global-tiny-text">À l’intérieur, les <b>pages de garde</b> (bleu foncé, bleu clair, grises ou
+      blanches selon les éditions) sont collées au revers des plats.</p>
+  </div>`;
+}
+
+function montrerPartie(i) {
+  const mv = $('#album-3d');
+  if (!mv) return;
+  document.querySelectorAll('[data-partie]').forEach(el => el.classList.toggle('on', el.dataset.partie === String(i)));
+  mv.cameraOrbit = `${PARTIES[i].vue} auto`;
 }
 
 function carteAlbum(a) {
@@ -279,7 +313,7 @@ function vueAlbum() {
   const series = seriesDispo(a);
   const etapes = [
     { t: 'Album', ok: true, now: false },
-    { t: 'Quatrième plat', ok: !!state.serie, now: !state.serie },
+    { t: '2e plat', ok: !!state.serie, now: !state.serie },
     { t: 'Édition précise', ok: !!state.edition, now: !!state.serie && !state.edition },
     { t: 'État', ok: !!state.etat, now: !!state.edition && !state.etat },
     { t: 'Estimation', ok: false, now: !!state.etat }
@@ -296,8 +330,8 @@ function vueAlbum() {
         <div class="tags">
           <span class="tag">Première parution en album&nbsp;: ${a.annee}</span>
           <span class="tag">${editions(a).length} éditions référencées</span>
-          <span class="tag">Séries ${series.join(', ')}</span>
-          <span class="tag">Cote EO&nbsp;: ${eur(a.eo)}</span>
+          <span class="tag">Séries ${series.map(s => SERIES[s].code === 'V' ? '2e plat blanc' : s).join(', ')}</span>
+          ${coteEO(a) != null ? `<span class="tag">Cote EO (TBE)&nbsp;: ${eur(coteEO(a))}</span>` : ''}
         </div>
         <p class="global-text" style="font-size:18px;line-height:24px;margin:0">Renseignez les caractéristiques de
           votre exemplaire. Chaque réponse affine la fourchette&nbsp;; vous pouvez revenir en arrière à tout moment.</p>
@@ -312,7 +346,6 @@ function vueAlbum() {
 
     ${blocSerie(a, series)}
     ${state.serie ? blocEdition(a) : ''}
-    ${state.edition ? blocOptions(a) : ''}
     ${state.edition ? blocEtat(a) : ''}
     ${state.etat ? blocResultat(a) : ''}
     ${state.etat ? blocArgus(a) : ''}
@@ -323,7 +356,7 @@ function blocSerie(a, series) {
   return `
   <div class="q" id="q-serie">
     <span class="step">Étape 1</span>
-    <h2 class="global-sub-title">Quel est le quatrième plat de votre album&nbsp;?</h2>
+    <h2 class="global-sub-title">Quel est le 2e plat de votre album&nbsp;?</h2>
     <p class="global-text">Retournez l’album&nbsp;: la mise en page de la liste des titres d’Hergé indique la série.
        Ne vous fiez ni au copyright, ni au dépôt légal.</p>
     <div class="series">
@@ -348,40 +381,26 @@ function blocEdition(a) {
   <div class="q" id="q-edition">
     <span class="step">Étape 2</span>
     <h2 class="global-sub-title">Quelle variante exactement&nbsp;?</h2>
-    <p class="global-text">${S.detail} Repérez le dernier titre annoncé au quatrième plat&nbsp;: il donne l’année de tirage.</p>
-    <div class="vars">
+    <p class="global-text">${S.detail} Repérez le code imprimé au 2e plat, puis la couleur du dos, les gardes
+       et le numéro d’imprimeur.</p>
+    <div class="opts editions">
       ${list.map(e => `
-        <button class="var ${state.edition && state.edition.code === e.code ? 'on' : ''}" data-edition="${e.code}">
-          <b>${e.code}</b><span>${e.annee}${e.eo ? ' · EO' : ''}</span></button>`).join('')}
+        <button class="opt ${state.edition && state.edition.id === e.id ? 'on' : ''}" data-edition="${e.id}"
+          ${e.cote == null ? 'disabled' : ''}>
+          <span class="txt">
+            <span class="ot">${nomPlat(e)} <em>· ${e.annee}${e.eo ? ' · EO' : ''}${e.dos ? ' · ' + SIGLES_DOS[e.dos] : ''}</em></span>
+            ${e.desc ? `<span class="oa">${e.desc}</span>` : ''}
+          </span>
+          <span class="oc">${e.cote == null ? 'Cote n.c.' : eur(e.cote)}</span></button>`).join('')}
     </div>
-    
-  </div>`;
-}
 
-function blocOptions(a) {
-  const dispo = OPTIONS.filter(o => o.series.includes(state.serie));
-  if (!dispo.length) return '';
-  return `
-  <div class="q" id="q-options">
-    <span class="step">Étape 3</span>
-    <h2 class="global-sub-title">Votre exemplaire présente-t-il ces caractéristiques&nbsp;?</h2>
-    <p class="global-text">Facultatif, mais c’est souvent là que se creuse l’écart entre deux exemplaires de la même édition.</p>
-    <div class="opts">
-      ${dispo.map(o => {
-        const on = state.options.includes(o.code);
-        return `<button class="opt ${on ? 'on' : ''}" data-option="${o.code}">
-          <span class="box">✓</span>
-          
-          <span class="oa">${o.aide}</span></span></button>`;
-      }).join('')}
-    </div>
   </div>`;
 }
 
 function blocEtat(a) {
   return `
   <div class="q" id="q-etat">
-    <span class="step">Étape 4</span>
+    <span class="step">Étape 3</span>
     <h2 class="global-sub-title">Dans quel état est-il&nbsp;?</h2>
     <p class="global-text">Regardez d’abord les coiffes (haut et bas du dos), puis les coins et l’aspect des plats.
        Soyez sévère&nbsp;: c’est ainsi que jugera l’acheteur.</p>
@@ -397,7 +416,7 @@ function blocEtat(a) {
 }
 
 function blocResultat(a) {
-  const est = estimer(a, state.edition, state.etat, state.options);
+  const est = estimer(a, state.edition, state.etat);
   const ventes = ventesComparables(a, state.edition, est.etat);
   const conf = Math.min(5, Math.max(2, Math.round(est.ventes / 6) + 1));
   const up = est.tendance >= 0;
@@ -423,15 +442,13 @@ function blocResultat(a) {
       <div class="body">
         <div class="recap">
           <span><b>${esc(a.titre)}</b></span>
-          <span>${SERIES[state.edition.serie].nom} — ${state.edition.code} (${state.edition.annee})</span>
+          <span>${nomPlat(state.edition)} (${state.edition.annee})${state.edition.dos ? ' · ' + SIGLES_DOS[state.edition.dos] : ''}</span>
           <span>${est.etat.nom}</span>
-          ${est.mods.map(m => `<span>${m.nom}</span>`).join('')}
         </div>
 
         <div class="calc">
-          <div class="r"><span>Cote de référence — ${state.edition.code}, très bon état</span><span>${eur(est.base)}</span></div>
+          <div class="r"><span>Cote de référence — ${nomPlat(state.edition)}, très bon état</span><span>${eur(est.base)}</span></div>
           <div class="r"><span>État «&nbsp;${est.etat.nom}&nbsp;» — coefficient ${est.etat.coef.toFixed(2).replace('.', ',')}</span><span>${eur(est.apresEtat)}</span></div>
-          ${est.mods.map(m => `<div class="r mod"><span>${m.nom}</span><span>+ ${eur(m.montant)}</span></div>`).join('')}
           <div class="r tot"><span>Estimation</span><span>${eur(est.total)}</span></div>
         </div>
 
@@ -452,7 +469,7 @@ function blocResultat(a) {
             <h3 class="global-small-title">Évolution de la cote</h3>
             <div class="trend">
               <div class="th">
-                <span class="tl">${state.edition.code} en très bon état · 6 ans</span>
+                <span class="tl">${codePlat(state.edition)} en très bon état · 6 ans</span>
              
               </div>
               ${courbeSVG(a, state.edition)}
@@ -462,13 +479,11 @@ function blocResultat(a) {
 
         <div class="cta">
           <button class="button blue" data-add>Ajouter à ma collection</button>
-          <button class="button white" data-print>Télécharger l’estimation (PDF)</button>
-          <button class="button white" data-expert>Demander une expertise</button>
           <button class="button sand" data-reset>Recommencer</button>
         </div>
 
-        <p class="legal">Estimation indicative fondée sur les ventes publiques observées, les catalogues de libraires
-          spécialisés et les cotations de référence. Elle ne constitue ni une offre d’achat, ni une expertise
+        <p class="legal">Cote de référence issue du catalogue BDM (très bon état). Les ventes comparables et l’évolution
+          de la cote sont simulées dans cette maquette. Elle ne constitue ni une offre d’achat, ni une expertise
           contradictoire. Un exemplaire exceptionnel (dédicace authentifiée, provenance documentée) peut sortir
           largement de cette fourchette.</p>
       </div>
@@ -477,22 +492,22 @@ function blocResultat(a) {
 }
 
 function blocArgus(a) {
-  const list = editions(a).filter(e => e.code === state.edition.code);
+  const list = editions(a).filter(e => e.id === state.edition.id);
   return `
   <div class="argus">
     <div class="sec-head">
       <h2 class="global-sub-title">Argus complet — ${esc(a.titre)}</h2>
-      <span class="note">Cotes pour un exemplaire en très bon état, hors options</span>
+      <span class="note">Cotes pour un exemplaire en très bon état</span>
     </div>
     <div class="argus-wrap scroll-x">
       <table>
         <thead><tr>
-          <th>Édition</th><th>Série</th><th>Année</th>
+          <th>2e plat</th><th>Série</th><th>Année</th>
           ${ETATS.map(e => `<th>${e.nom}</th>`).join('')}<th>Ventes</th>
         </tr></thead>
         <tbody>
           ${list.map(e => `<tr>
-            <td class="code">${e.code}${e.eo ? ' <span class="eo">EO</span>' : ''}</td>
+            <td class="code">${codePlat(e)}${e.eo ? ' <span class="eo">EO</span>' : ''}</td>
             <td><span class="sdot" style="background:${SERIES[e.serie].couleur}"></span>${SERIES[e.serie].nom}</td>
             <td>${e.annee}</td>
             ${ETATS.map(et => `<td class="${et.code === state.etat ? 'ref' : ''}">${eur(arrondi(e.cote * et.coef))}</td>`).join('')}
@@ -520,7 +535,7 @@ function majCompteur() {
 function ajouterCollection(a, est) {
   state.collection.push({
     slug: a.slug, titre: a.titre,
-    edition: state.edition.code, annee: state.edition.annee,
+    edition: nomPlat(state.edition), annee: state.edition.annee,
     etat: est.etat.nom, valeur: est.total
   });
   sauverCollection(); renderDrawer(); toast('Ajouté à votre collection');
@@ -569,44 +584,38 @@ document.addEventListener('click', ev => {
 
   if (hit('[data-home]') || hit('[data-logo]')) { ev.preventDefault(); go('accueil'); return; }
 
+  const partie = hit('[data-partie]');
+  if (partie) { montrerPartie(+partie.dataset.partie); return; }
+
   const carte = hit('[data-slug]');
   if (carte) { go('album', carte.dataset.slug); return; }
 
   const s = hit('[data-serie]');
   if (s) {
-    state.serie = s.dataset.serie; state.edition = null; state.etat = null; state.options = [];
+    state.serie = s.dataset.serie; state.edition = null; state.etat = null;
     render(); scrollVers('q-edition'); return;
   }
 
   const e = hit('[data-edition]');
   if (e) {
     const a = albumBySlug(state.slug);
-    state.edition = editions(a).find(x => x.code === e.dataset.edition);
-    state.etat = null; render(); scrollVers('q-options'); return;
-  }
-
-  const o = hit('[data-option]');
-  if (o) {
-    const c = o.dataset.option;
-    state.options = state.options.includes(c) ? state.options.filter(x => x !== c) : [...state.options, c];
-    render(); scrollVers(state.etat ? 'q-resultat' : 'q-options'); return;
+    state.edition = editions(a).find(x => x.id === e.dataset.edition);
+    state.etat = null; render(); scrollVers('q-etat'); return;
   }
 
   const et = hit('[data-etat]');
   if (et) { state.etat = et.dataset.etat; render(); scrollVers('q-resultat'); return; }
 
   if (hit('[data-reset]')) {
-    state.serie = state.edition = state.etat = null; state.options = [];
+    state.serie = state.edition = state.etat = null;
     render(); scrollVers('q-serie'); return;
   }
 
   if (hit('[data-add]')) {
     const a = albumBySlug(state.slug);
-    ajouterCollection(a, estimer(a, state.edition, state.etat, state.options));
+    ajouterCollection(a, estimer(a, state.edition, state.etat));
     return;
   }
-  if (hit('[data-print]')) { toast('Maquette — la génération du PDF n’est pas branchée'); return; }
-  if (hit('[data-expert]')) { toast('Maquette — le formulaire d’expertise n’est pas branché'); return; }
   if (hit('[data-noop]')) { toast('Maquette — écran non branché'); return; }
 
   if (hit('#open-coll')) { renderDrawer(); $('#drawer').classList.add('open'); $('#scrim').classList.add('open'); return; }
