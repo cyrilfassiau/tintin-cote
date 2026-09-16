@@ -70,7 +70,6 @@ function editions(album) {
 
 const editionsSerie = (album, serie) => editions(album).filter(e => e.serie === serie);
 const seriesDispo = album => ['P', 'A', 'B', 'C', 'D'].filter(s => editionsSerie(album, s).length);
-const coteMax = album => Math.max(...editions(album).map(e => e.cote));
 
 
 
@@ -169,8 +168,6 @@ function courbeSVG(album, edition) {
   <div class="ax"><span>2020</span><span>2026</span></div>`;
 }
 
-const LOUPE = `<svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-  <circle cx="8.5" cy="8.5" r="6"/><path d="M13 13l5 5" stroke-linecap="round"/></svg>`;
 
 
 
@@ -181,8 +178,6 @@ const state = {
   edition: null,
   etat: null,
   options: [],
-  recherche: '',
-  filtre: 'tous',
   collection: JSON.parse(localStorage.getItem('cote-collection') || '[]')
 };
 
@@ -197,35 +192,8 @@ function go(vue, slug) {
 
 
 
-const FILTRES = [
-  { id: 'tous', label: 'Tous les albums' },
-  { id: 'nb', label: 'Existe en noir & blanc' },
-  { id: 'or', label: 'Cote supérieure à 1 000 €' },
-  { id: '30', label: 'Années 1930' },
-  { id: '40', label: 'Années 1940' },
-  { id: '50', label: 'Années 1950' },
-  { id: '60+', label: '1960 et après' }
-];
-
-function albumsFiltres() {
-  const q = state.recherche.trim().toLowerCase();
-  return ALBUMS.filter(a => {
-    if (q && !a.titre.toLowerCase().includes(q)) return false;
-    switch (state.filtre) {
-      case 'nb': return a.nb;
-      case 'or': return a.eo >= 1000;
-      case '30': return a.annee < 1940;
-      case '40': return a.annee >= 1940 && a.annee < 1950;
-      case '50': return a.annee >= 1950 && a.annee < 1960;
-      case '60+': return a.annee >= 1960;
-      default: return true;
-    }
-  });
-}
-
 function vueAccueil() {
-  const liste = albumsFiltres();
-  const top = [...ALBUMS].sort((a, b) => b.eo - a.eo).slice(0, 5);
+  const liste = ALBUMS;
 
   return `
   <section class="app-content intro">
@@ -238,7 +206,7 @@ function vueAccueil() {
         <div class="figures">
           <div class="figure"><div class="n">24</div><div class="l">albums couverts</div></div>
           <div class="figure"><div class="n">312</div><div class="l">éditions référencées</div></div>
-          <div class="figure"><div class="n">8 400</div><div class="l">ventes analysées</div></div>
+         
         </div>
       </div>
       <div>
@@ -259,42 +227,17 @@ function vueAccueil() {
   </section>
 
   <section class="app-content finder">
-    <label class="search">
-      ${LOUPE}
-      <input id="q" type="search" placeholder="Rechercher un album — Le Lotus bleu, Objectif Lune…"
-             value="${esc(state.recherche)}" autocomplete="off">
-    </label>
-    <div class="filters">
-      <span class="lbl">Filtrer&nbsp;:</span>
-      ${FILTRES.map(f => `<button class="chip ${state.filtre === f.id ? 'on' : ''}" data-filtre="${f.id}">${f.label}</button>`).join('')}
-    </div>
+    <p class="global-text" style="margin:35px 0 0;max-width:900px">L’<b>année du copyright</b> indiquée dans
+      le livre <b>n’est pas toujours celle de l’impression</b> de l’album&nbsp;: fiez-vous au <b>deuxième plat</b>
+      pour dater votre édition. Les cotes sont données pour un album en <b>état neuf</b>&nbsp;; s’il est usé,
+      sa cote <b>diminue d’au moins 50&nbsp;%</b>.</p>
 
     <div class="sec-head">
-      <h2 class="global-sub-title">${liste.length} album${liste.length > 1 ? 's' : ''}</h2>
-      <span class="note">Cotes indicatives pour un exemplaire en très bon état · mise à jour&nbsp;: juillet 2026</span>
+      <h2 class="global-sub-title">${liste.length} titre${liste.length > 1 ? 's' : ''}</h2>
+      <span class="note">Mise à jour&nbsp;: juillet 2026</span>
     </div>
 
-    ${liste.length ? `<div class="albums">${liste.map(carteAlbum).join('')}</div>`
-      : `<div class="empty">Aucun album ne correspond à cette recherche.</div>`}
-  </section>
-
-  <section class="band">
-    <div class="app-content">
-      <div class="sec-head">
-        <h2 class="global-sub-title">Les cotes les plus élevées</h2>
-        <span class="note">Édition originale, exemplaire en très bon état</span>
-      </div>
-      <div class="top">
-        ${top.map((a, i) => `
-          <button class="row" data-slug="${a.slug}">
-            <span class="rk">${i + 1}</span>
-            <span class="th"><img src="${cover(a)}" alt=""></span>
-            <span><span class="tt">${esc(a.titre)}</span><br>
-              <span class="ts">Édition originale ${a.annee}</span></span>
-            <span class="tv">${eur(a.eo)}</span>
-          </button>`).join('')}
-      </div>
-    </div>
+    <div class="albums">${liste.map(carteAlbum).join('')}</div>
   </section>
 
   <section class="app-content" style="padding-top:45px;padding-bottom:10px">
@@ -320,17 +263,12 @@ function vueAccueil() {
 }
 
 function carteAlbum(a) {
-  const max = coteMax(a);
-  const rare = a.eo >= 6000;
   return `
   <button class="album" data-slug="${a.slug}">
     <span class="shell">
       <img src="${cover(a)}" alt="Couverture de ${esc(a.titre)}" loading="lazy">
-      ${rare ? '<span class="flag">Très recherché</span>' : ''}
     </span>
     <span class="t">${esc(a.titre)}</span>
-    <span class="m">${a.annee} · ${editions(a).length} éditions</span>
-    <span class="c">jusqu’à ${eur(max)}</span>
   </button>`;
 }
 
@@ -377,7 +315,7 @@ function vueAlbum() {
     ${state.edition ? blocOptions(a) : ''}
     ${state.edition ? blocEtat(a) : ''}
     ${state.etat ? blocResultat(a) : ''}
-    ${blocArgus(a)}
+    ${state.etat ? blocArgus(a) : ''}
   </div>`;
 }
 
@@ -539,7 +477,7 @@ function blocResultat(a) {
 }
 
 function blocArgus(a) {
-  const list = editions(a);
+  const list = editions(a).filter(e => e.code === state.edition.code);
   return `
   <div class="argus">
     <div class="sec-head">
@@ -557,7 +495,7 @@ function blocArgus(a) {
             <td class="code">${e.code}${e.eo ? ' <span class="eo">EO</span>' : ''}</td>
             <td><span class="sdot" style="background:${SERIES[e.serie].couleur}"></span>${SERIES[e.serie].nom}</td>
             <td>${e.annee}</td>
-            ${ETATS.map(et => `<td class="${et.ref ? 'ref' : ''}">${eur(arrondi(e.cote * et.coef))}</td>`).join('')}
+            ${ETATS.map(et => `<td class="${et.code === state.etat ? 'ref' : ''}">${eur(arrondi(e.cote * et.coef))}</td>`).join('')}
             <td>${e.ventes}</td>
           </tr>`).join('')}
         </tbody>
@@ -634,9 +572,6 @@ document.addEventListener('click', ev => {
   const carte = hit('[data-slug]');
   if (carte) { go('album', carte.dataset.slug); return; }
 
-  const chip = hit('[data-filtre]');
-  if (chip) { state.filtre = chip.dataset.filtre; render(); return; }
-
   const s = hit('[data-serie]');
   if (s) {
     state.serie = s.dataset.serie; state.edition = null; state.etat = null; state.options = [];
@@ -679,15 +614,6 @@ document.addEventListener('click', ev => {
 
   const del = hit('[data-del]');
   if (del) { state.collection.splice(+del.dataset.del, 1); sauverCollection(); renderDrawer(); return; }
-});
-
-document.addEventListener('input', ev => {
-  if (ev.target.id === 'q') {
-    state.recherche = ev.target.value;
-    const pos = ev.target.selectionStart;
-    render();
-    const f = $('#q'); if (f) { f.focus(); f.setSelectionRange(pos, pos); }
-  }
 });
 
 document.addEventListener('keydown', ev => {
