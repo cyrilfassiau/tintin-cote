@@ -220,9 +220,12 @@ b, strong { font-family: 'semibold'; font-weight: normal; }
 
 
 .albums { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 30px 22px; }
-.album { display: block; width: 100%; text-align: left; }
+/* Flex colonne, et non display:block : un <button> centre verticalement son contenu, si bien
+   que la grille — qui étire chaque carte à la hauteur de la plus haute de la rangée — faisait
+   descendre l'image des cartes à titre court et désalignait la mosaïque. */
+.album { display: flex; flex-direction: column; align-items: stretch; width: 100%; text-align: left; }
 .album .shell {
-  display: block; position: relative; aspect-ratio: 340 / 453; border-radius: 4px; overflow: hidden;
+  display: block; position: relative; flex: none; aspect-ratio: 340 / 453; border-radius: 4px; overflow: hidden;
   background: var(--sand); box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 10px 20px -12px rgba(0,0,0,.45);
   transition: transform .25s, box-shadow .25s;
 }
