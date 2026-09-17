@@ -313,9 +313,37 @@ b, strong { font-family: 'semibold'; font-weight: normal; }
 .editions .opt { align-items: center; }
 .editions .txt { flex: 1; }
 .editions .oc { flex: none; font-family: 'semicondensed'; font-size: 20px; color: var(--blue); white-space: nowrap; }
-.editions .opt[aria-disabled="true"] { cursor: not-allowed; opacity: .55; }
+/* Variante sans cote : listée pour l'identification, mais non estimable.
+   Volontairement lisible (pas d'opacité globale) : le motif doit pouvoir se lire. */
+.editions .opt[aria-disabled="true"] { cursor: not-allowed; background: var(--sand-2); border-style: dashed; }
 .editions .opt[aria-disabled="true"]:hover { border-color: var(--line); }
-.editions .opt[aria-disabled="true"] .oc { font-family: 'regular'; font-size: 14px; color: var(--grey); }
+.editions .opt[aria-disabled="true"] .ot,
+.editions .opt[aria-disabled="true"] .ot em,
+.editions .opt[aria-disabled="true"] .oa { color: var(--grey-3); }
+.editions .opt[aria-disabled="true"] .oc {
+  font-family: 'semibold'; font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
+  color: #7a5a12; background: var(--yellow); border-radius: 4px; padding: 6px 10px;
+}
+.nc-why {
+  display: block; position: relative; margin-top: 7px; padding-left: 21px;
+  font-family: 'regular'; font-size: 13px; line-height: 17px; color: var(--grey-2);
+}
+.nc-why::before {
+  content: "i"; position: absolute; left: 0; top: 1px; width: 15px; height: 15px;
+  border-radius: 50%; background: var(--yellow); color: #7a5a12;
+  font-family: 'semibold'; font-size: 10px; line-height: 15px; text-align: center;
+}
+.nc-note .ncm { display: block; margin-top: 7px; padding-left: 21px; position: relative; }
+.nc-note .ncm::before {
+  content: "i"; position: absolute; left: 0; top: 1px; width: 15px; height: 15px;
+  border-radius: 50%; background: var(--yellow); color: #7a5a12;
+  font-family: 'semibold'; font-size: 10px; line-height: 15px; text-align: center;
+}
+.nc-note {
+  font-family: 'regular'; font-size: 15px; line-height: 21px; color: var(--grey-2);
+  background: var(--sand); border: 1px solid var(--line); border-left: 3px solid var(--yellow);
+  border-radius: 8px; padding: 13px 17px; margin: 0 0 16px; max-width: 780px;
+}
 .opt .oa { display: block; font-family: 'regular'; font-size: 14px; line-height: 19px; color: var(--grey); margin-top: 2px; }
 
 
@@ -482,3 +510,5 @@ b, strong { font-family: 'semibold'; font-weight: normal; }
 .plat-preview.has-img .ppn { display: none; }
 
 @media (max-width: 1000px) { .plat-preview { display: none; } }
+
+.nc-note .ncm i { font-style: normal; font-family: 'regular'; color: var(--grey); }

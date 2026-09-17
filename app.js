@@ -42,6 +42,23 @@ const serieDe = plat => plat === 'blanc' ? 'V' : plat[0];
 const nomPlat = e => e.plat === 'blanc' ? '2e plat blanc' : `2e plat ${e.plat}`;
 const codePlat = e => e.plat === 'blanc' ? 'Blanc' : e.plat;
 
+// Une variante sans cote (cote: null dans data.js) reste listée — elle sert à identifier
+// l'exemplaire — mais ne peut pas être estimée, faute de montant de référence à pondérer
+// par l'état. Deux situations très différentes derrière ce même vide, à expliciter :
+//   • le catalogue BDM ne lui attribue volontairement aucune cote (édition douteuse) ;
+//   • la cote existe mais n'a pas encore été reprise dans nos données.
+const MOTIFS_SANS_COTE = {
+  doute: {
+    une: 'Le catalogue BDM ne donne aucune cote à cette variante, dont l’existence même est mise en doute. Elle est listée à titre documentaire.',
+    plusieurs: 'Le catalogue BDM ne leur donne aucune cote&nbsp;: leur existence même est mise en doute. Elles sont listées à titre documentaire.'
+  },
+  nonReleve: {
+    une: 'La cote de cette variante n’a pas encore été relevée dans nos données. Elle deviendra sélectionnable dès qu’elle sera renseignée.',
+    plusieurs: 'Leur cote n’a pas encore été relevée dans nos données. Elles deviendront sélectionnables dès qu’elles seront renseignées.'
+  }
+};
+const motifSansCote = e => /mise en doute/i.test(e.desc || '') ? 'doute' : 'nonReleve';
+
 // Cotes et descriptions issues de data.js ; ventes et tendance restent simulées.
 function editions(album) {
   return album.editions.map((e, i) => {
@@ -435,12 +452,32 @@ function blocSerie(a, series) {
 function blocEdition(a) {
   const list = editionsSerie(a, state.serie);
   const S = SERIES[state.serie];
+  const indispo = list.filter(e => e.cote == null);
+  const sansCote = indispo.length;
+  // Le motif majoritaire est énoncé une fois dans l'encadré, plutôt que répété à l'identique
+  // sur chaque ligne ; seules les variantes qui font exception portent leur propre explication.
+  const compte = {};
+  indispo.forEach(e => { const m = motifSansCote(e); compte[m] = (compte[m] || 0) + 1; });
+  const motifDominant = Object.keys(compte).sort((x, y) => compte[y] - compte[x])[0] || null;
+  const exceptions = sansCote - (compte[motifDominant] || 0);
   return `
   <div class="q" id="q-edition">
     <span class="step">Étape 2</span>
     <h2 class="global-sub-title">Quelle variante exactement&nbsp;?</h2>
     <p class="global-text">${S.detail} Repérez le code imprimé au 2e plat, puis la couleur du dos, les gardes
        et le numéro d’imprimeur.</p>
+    ${sansCote ? `
+    <p class="nc-note">${sansCote === list.length
+        ? `<b>Aucune des ${list.length} variantes de cette série n’a de cote disponible</b> pour le moment.`
+        : `<b>${sansCote} variante${sansCote > 1 ? 's' : ''} sur ${list.length}
+           n’${sansCote > 1 ? 'ont' : 'a'} pas de cote disponible</b>${sansCote > 1 ? '' : ''}.`}
+       Elle${sansCote > 1 ? 's' : ''} ne peu${sansCote > 1 ? 'vent' : 't'} donc pas être
+       estimée${sansCote > 1 ? 's' : ''}, et ${sansCote > 1 ? 'apparaissent' : 'apparaît'} en grisé, encadrée${sansCote > 1 ? 's' : ''}
+       de pointillés&nbsp;: nous ${sansCote > 1 ? 'les' : 'la'} laissons visible${sansCote > 1 ? 's' : ''} pour que vous
+       puissiez malgré tout identifier votre exemplaire.
+       <span class="ncm">${MOTIFS_SANS_COTE[motifDominant][compte[motifDominant] > 1 ? 'plusieurs' : 'une']}${exceptions
+         ? ` <i>(${exceptions} exception${exceptions > 1 ? 's' : ''} dans cette liste, signalée${exceptions > 1 ? 's' : ''} ligne par ligne.)</i>`
+         : ''}</span></p>` : ''}
     <div class="opts editions">
       ${list.map(e => `
         <button class="opt ${state.edition && state.edition.id === e.id ? 'on' : ''}" data-edition="${e.id}"
@@ -448,8 +485,10 @@ function blocEdition(a) {
           <span class="txt">
             <span class="ot">${nomPlat(e)} <em>· ${e.annee}${e.eo ? ' · EO' : ''}${e.dos ? ' · ' + SIGLES_DOS[e.dos] : ''}</em></span>
             ${e.desc ? `<span class="oa">${e.desc}</span>` : ''}
+            ${e.cote == null && motifSansCote(e) !== motifDominant
+              ? `<span class="nc-why">${MOTIFS_SANS_COTE[motifSansCote(e)].une}</span>` : ''}
           </span>
-          ${e.cote == null ? '<span class="oc">Cote n.c.</span>' : ''}</button>`).join('')}
+          ${e.cote == null ? '<span class="oc">Cote absente</span>' : ''}</button>`).join('')}
     </div>
 
   </div>`;
