@@ -265,7 +265,6 @@ function vueAccueil() {
           <div class="figure"><div class="n">${nbEditions()}</div><div class="l">éditions référencées</div></div>
 
         </div>
-        ${encartParties()}
       </div>
       <div>
         <div class="cards" style="margin:0">
@@ -282,6 +281,7 @@ function vueAccueil() {
         </div>
       </div>
     </div>
+    ${encartParties()}
   </section>
 
   <section class="app-content finder">
@@ -345,8 +345,10 @@ const VUE_INITIALE = '-30deg 70deg auto';
 function encartParties() {
   return `
   <div class="cards parties">
-    <h2 class="global-small-title">Les parties d’un album</h2>
-    <p class="global-tiny-text">Faites tourner l’album avec la souris, ou cliquez sur une partie pour la voir.</p>
+    <div class="ph">
+      <h2 class="global-small-title">Les parties d’un album</h2>
+      <p class="global-tiny-text">Faites tourner l’album avec la souris, ou cliquez sur une partie pour la voir.</p>
+    </div>
     <model-viewer id="album-3d" class="viewer" src="assets/models/album.glb" alt="Modèle 3D d’un album"
       camera-controls disable-zoom touch-action="pan-y" interaction-prompt="none" shadow-intensity="1"
       camera-orbit="${VUE_INITIALE}" min-camera-orbit="auto 5deg auto" max-camera-orbit="auto 175deg auto">
@@ -354,13 +356,15 @@ function encartParties() {
         <button class="hotspot" slot="hotspot-${i}" data-partie="${i}" data-position="${p.position}"
           data-normal="${p.normale}" data-visibility-attribute="visible" title="${p.nom}">${i + 1}</button>`).join('')}
     </model-viewer>
-    <ol class="legende">
-      ${PARTIES.map((p, i) => `
-        <li><button data-partie="${i}"><span class="n">${i + 1}</span>
-          <span><span class="t">${p.nom}</span><span class="d">${p.desc}</span></span></button></li>`).join('')}
-    </ol>
-    <p class="global-tiny-text">À l’intérieur, les <b>pages de garde</b> (bleu foncé, bleu clair, grises ou
-      blanches selon les éditions) sont collées au revers des plats.</p>
+    <div class="pl">
+      <ol class="legende">
+        ${PARTIES.map((p, i) => `
+          <li><button data-partie="${i}"><span class="n">${i + 1}</span>
+            <span><span class="t">${p.nom}</span><span class="d">${p.desc}</span></span></button></li>`).join('')}
+      </ol>
+      <p class="global-tiny-text">À l’intérieur, les <b>pages de garde</b> (bleu foncé, bleu clair, grises ou
+        blanches selon les éditions) sont collées au revers des plats.</p>
+    </div>
   </div>`;
 }
 
