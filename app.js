@@ -114,7 +114,64 @@ function platSVG(serie) {
 }
 
 
+// Aperçu photographique du 2e plat, affiché au survol d'une variante (étape 2).
+// Le visuel est indexé sur le CODE du plat, pas sur la variante : un B24 est le même
+// 2e plat quel que soit l'album. 102 fichiers couvrent donc les 809 variantes.
+//   assets/plats/b24.png, assets/plats/a18.png, assets/plats/p6-bis.png, assets/plats/blanc.png…
+// Pour forcer un visuel sur une seule variante, passez un 7e argument à E() dans data.js.
+// Tant qu'un fichier manque, la vignette dessinée par platSVG() sert de repère.
+const fichierPlat = code => code
+  .toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '');
 
+const imagePlat = e => e.img || `assets/plats/${fichierPlat(codePlat(e))}.png`;
+
+let apercuEl = null, apercuCible = null;
+
+function montrerApercu(btn, e) {
+  if (!apercuEl) {
+    apercuEl = document.createElement('div');
+    apercuEl.className = 'plat-preview';
+    document.body.appendChild(apercuEl);
+  }
+  apercuEl.classList.remove('has-img');
+  apercuEl.innerHTML = `
+    <div class="pp-viz">
+      ${platSVG(serieDe(e.plat))}
+      <img alt="2e plat ${esc(codePlat(e))}">
+    </div>
+    <span class="ppt">${nomPlat(e)}</span>
+    <span class="ppd">${e.annee}${e.dos ? ' · ' + SIGLES_DOS[e.dos] : ''}</span>
+    <span class="ppn">Visuel à venir — repère ${SERIES[serieDe(e.plat)].nom}</span>`;
+
+  const img = apercuEl.querySelector('img');
+  img.addEventListener('load', () => apercuEl.classList.add('has-img'));
+  img.src = imagePlat(e);
+
+  apercuCible = btn;
+  placerApercu();
+  apercuEl.classList.add('on');
+}
+
+function placerApercu() {
+  if (!apercuCible || !apercuEl) return;
+  const r = apercuCible.getBoundingClientRect();
+  const w = apercuEl.offsetWidth, h = apercuEl.offsetHeight;
+  const x = Math.min(r.right + 16, window.innerWidth - w - 12);
+  const y = Math.min(Math.max(12, r.top + r.height / 2 - h / 2), window.innerHeight - h - 12);
+  apercuEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+}
+
+function cacherApercu() {
+  apercuCible = null;
+  if (apercuEl) apercuEl.classList.remove('on');
+}
+
+
+// INUTILISÉE — les blocs « Ventes comparables » et « Évolution de la cote » ont été retirés
+// de l'écran de résultat. Conservée ici, avec courbeSVG(), pour pouvoir les réactiver.
 function ventesComparables(album, edition, etat) {
   const rnd = seeded(album.slug + edition.id + etat.code);
   const sites = ['Vente aux enchères — Paris', 'Libraire spécialisé', 'Enchères en ligne', 'Salon du livre ancien', 'Vente privée'];
@@ -133,6 +190,7 @@ function ventesComparables(album, edition, etat) {
   }).sort((a, b) => b.prix - a.prix);
 }
 
+// INUTILISÉE — voir la note sur ventesComparables().
 function courbeSVG(album, edition) {
   const rnd = seeded(album.slug + edition.id + 'trend');
   const n = 7, pts = [];
@@ -202,7 +260,7 @@ function vueAccueil() {
             <li><span class="n">3</span><span><span class="t">J’évalue son état</span>
               <span class="d">Coiffes, coins et plats, du neuf au mauvais état.</span></span></li>
             <li><span class="n">4</span><span><span class="t">J’obtiens sa cote</span>
-              <span class="d">Une fourchette argumentée, avec les ventes comparables.</span></span></li>
+              <span class="d">Une fourchette de marché, détaillée ligne par ligne.</span></span></li>
           </ul>
         </div>
       </div>
@@ -386,12 +444,12 @@ function blocEdition(a) {
     <div class="opts editions">
       ${list.map(e => `
         <button class="opt ${state.edition && state.edition.id === e.id ? 'on' : ''}" data-edition="${e.id}"
-          ${e.cote == null ? 'disabled' : ''}>
+          ${e.cote == null ? 'aria-disabled="true"' : ''}>
           <span class="txt">
             <span class="ot">${nomPlat(e)} <em>· ${e.annee}${e.eo ? ' · EO' : ''}${e.dos ? ' · ' + SIGLES_DOS[e.dos] : ''}</em></span>
             ${e.desc ? `<span class="oa">${e.desc}</span>` : ''}
           </span>
-          <span class="oc">${e.cote == null ? 'Cote n.c.' : eur(e.cote)}</span></button>`).join('')}
+          ${e.cote == null ? '<span class="oc">Cote n.c.</span>' : ''}</button>`).join('')}
     </div>
 
   </div>`;
@@ -417,9 +475,7 @@ function blocEtat(a) {
 
 function blocResultat(a) {
   const est = estimer(a, state.edition, state.etat);
-  const ventes = ventesComparables(a, state.edition, est.etat);
   const conf = Math.min(5, Math.max(2, Math.round(est.ventes / 6) + 1));
-  const up = est.tendance >= 0;
 
   return `
   <div class="q" id="q-resultat">
@@ -435,7 +491,6 @@ function blocResultat(a) {
         <div class="conf">
           <div class="lbl">Fiabilité</div>
           <div class="dots">${Array.from({ length: 5 }, (_, i) => `<i class="${i < conf ? 'on' : ''}"></i>`).join('')}</div>
-          <div class="rng">${est.ventes} ventes observées<br>sur 24 mois</div>
         </div>
       </div>
 
@@ -452,40 +507,14 @@ function blocResultat(a) {
           <div class="r tot"><span>Estimation</span><span>${eur(est.total)}</span></div>
         </div>
 
-        <div class="res2">
-          <div>
-            <h3 class="global-small-title">Ventes comparables récentes</h3>
-            <div class="sales-wrap">
-              <table class="sales">
-                <thead><tr><th>Date</th><th>Canal</th><th>État</th><th>Prix</th></tr></thead>
-                <tbody>${ventes.map(v => `<tr>
-                  <td>${v.date}</td><td>${v.lieu}</td>
-                  <td><span class="st">${v.code}</span></td><td>${eur(v.prix)}</td></tr>`).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div>
-            <h3 class="global-small-title">Évolution de la cote</h3>
-            <div class="trend">
-              <div class="th">
-                <span class="tl">${codePlat(state.edition)} en très bon état · 6 ans</span>
-             
-              </div>
-              ${courbeSVG(a, state.edition)}
-            </div>
-          </div>
-        </div>
-
         <div class="cta">
           <button class="button blue" data-add>Ajouter à ma collection</button>
           <button class="button sand" data-reset>Recommencer</button>
         </div>
 
-        <p class="legal">Cote de référence issue du catalogue BDM (très bon état). Les ventes comparables et l’évolution
-          de la cote sont simulées dans cette maquette. Elle ne constitue ni une offre d’achat, ni une expertise
-          contradictoire. Un exemplaire exceptionnel (dédicace authentifiée, provenance documentée) peut sortir
-          largement de cette fourchette.</p>
+        <p class="legal">Cote de référence issue du catalogue BDM (très bon état). Cette estimation ne constitue
+          ni une offre d’achat, ni une expertise contradictoire. Un exemplaire exceptionnel (dédicace authentifiée,
+          provenance documentée) peut sortir largement de cette fourchette.</p>
       </div>
     </div>
   </div>`;
@@ -567,6 +596,7 @@ function toast(msg) {
 
 
 function render() {
+  cacherApercu();
   app.innerHTML = state.vue === 'accueil' ? vueAccueil() : vueAlbum();
   majCompteur();
 }
@@ -598,6 +628,8 @@ document.addEventListener('click', ev => {
 
   const e = hit('[data-edition]');
   if (e) {
+    // Variante sans cote au catalogue : survolable pour son 2e plat, mais pas sélectionnable.
+    if (e.getAttribute('aria-disabled') === 'true') return;
     const a = albumBySlug(state.slug);
     state.edition = editions(a).find(x => x.id === e.dataset.edition);
     state.etat = null; render(); scrollVers('q-etat'); return;
@@ -625,8 +657,28 @@ document.addEventListener('click', ev => {
   if (del) { state.collection.splice(+del.dataset.del, 1); sauverCollection(); renderDrawer(); return; }
 });
 
+// Aperçu du 2e plat au survol d'une variante. Sans effet sur écran tactile ou étroit,
+// où le panneau n'aurait pas la place de s'afficher à côté de la liste.
+const survolPossible = () =>
+  window.matchMedia('(hover: hover)').matches && window.innerWidth > 1000;
+
+document.addEventListener('mouseover', ev => {
+  const btn = ev.target.closest && ev.target.closest('#q-edition .opt');
+  if (btn === apercuCible) return;
+  if (!btn || !survolPossible()) { cacherApercu(); return; }
+  const a = albumBySlug(state.slug);
+  const e = a && editions(a).find(x => x.id === btn.dataset.edition);
+  if (e) montrerApercu(btn, e);
+});
+
+window.addEventListener('scroll', placerApercu, { passive: true });
+window.addEventListener('resize', cacherApercu);
+
 document.addEventListener('keydown', ev => {
-  if (ev.key === 'Escape') { $('#drawer').classList.remove('open'); $('#scrim').classList.remove('open'); }
+  if (ev.key === 'Escape') {
+    cacherApercu();
+    $('#drawer').classList.remove('open'); $('#scrim').classList.remove('open');
+  }
 });
 
 render();
